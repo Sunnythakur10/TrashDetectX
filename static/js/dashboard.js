@@ -110,3 +110,4 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log("DOM loaded, calling fetchReports...");
     fetchReports();
 });
+
