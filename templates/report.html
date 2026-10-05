@@ -3,326 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Report Trash - Smart Trash Monitoring</title>
+    <title>Report Trash | TrashDetectX</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
-
-    <!-- Custom Styles -->
-    <style>
-        body {
-            background: linear-gradient(135deg, #e9ecef 0%, #d3e0ea 100%);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            transition: background 0.3s ease, color 0.3s ease;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        .navbar {
-            border-radius: 0 0 15px 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            background: linear-gradient(90deg, #007bff, #0056b3);
-            padding: 0.5rem 1rem;
-        }
-
-        .navbar-brand {
-            font-size: 1.5rem;
-            color: #fff;
-            transition: transform 0.3s ease, color 0.3s ease;
-        }
-
-        .navbar-brand:hover {
-            transform: scale(1.05);
-            color: #ffeb3b;
-        }
-
-        .navbar-brand::after {
-            content: '';
-            position: absolute;
-            width: 0;
-            height: 3px;
-            bottom: -5px;
-            left: 0;
-            background: #ffeb3b;
-            transition: width 0.3s ease;
-        }
-
-        .navbar-brand:hover::after {
-            width: 100%;
-        }
-
-        .container {
-            max-width: 650px;
-            margin-top: 2rem;
-            flex: 1;
-            padding: 0 1rem;
-        }
-
-        h2 {
-            font-weight: 700;
-            color: #2c3e50;
-            text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
-            transition: color 0.3s ease;
-        }
-
-        .form-section {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-        }
-
-        .form-section:hover {
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
-            transform: translateY(-5px);
-        }
-
-        label {
-            font-weight: 600;
-            color: #34495e;
-            transition: color 0.3s ease;
-        }
-
-        .form-control,
-        .form-select {
-            border-radius: 12px;
-            transition: all 0.3s ease;
-            border: 1px solid #ced4da;
-            background: #fff;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-        }
-
-        .form-control:focus,
-        .form-select:focus {
-            box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25), 0 0 5px rgba(0, 123, 255, 0.1);
-            transform: translateY(-2px);
-            border-color: #007bff;
-            background: #f8f9fa;
-        }
-
-        .form-select {
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23333' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
-            background-repeat: no-repeat;
-            background-position: right 0.75rem center;
-            background-size: 16px 12px;
-        }
-
-        .btn {
-            border-radius: 30px;
-            padding: 12px 25px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            background: linear-gradient(90deg, #007bff, #0056b3);
-            color: #fff;
-            border: none;
-        }
-
-        .btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 18px rgba(0, 123, 255, 0.3);
-            background: linear-gradient(90deg, #0056b3, #003d80);
-        }
-
-        .btn:active {
-            transform: translateY(-1px);
-        }
-
-        .btn::after {
-            content: '';
-            display: block;
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            pointer-events: none;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 10%, transparent 10.01%);
-            background-repeat: no-repeat;
-            background-position: 50%;
-            transform: scale(10, 10);
-            opacity: 0;
-            transition: transform 0.5s, opacity 1s;
-        }
-
-        .btn:active::after {
-            transform: scale(0, 0);
-            opacity: 0.3;
-            transition: 0s;
-        }
-
-        .btn-danger {
-            background: linear-gradient(90deg, #dc3545, #b02a37);
-        }
-
-        .btn-danger:hover {
-            background: linear-gradient(90deg, #b02a37, #921a2b);
-            box-shadow: 0 6px 18px rgba(220, 53, 69, 0.3);
-        }
-
-        .btn-danger::after {
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 10%, transparent 10.01%);
-        }
-
-        .dark-mode {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%) !important;
-            color: #e9ecef !important;
-        }
-
-        .dark-mode .navbar {
-            background: linear-gradient(90deg, #2c3e50, #34495e);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-        }
-
-        .dark-mode .navbar-brand {
-            color: #e9ecef;
-        }
-
-        .dark-mode .navbar-brand:hover {
-            color: #ffca28;
-        }
-
-        .dark-mode .navbar-brand::after {
-            background: #ffca28;
-        }
-
-        .dark-mode .form-control,
-        .dark-mode .form-select {
-            background: #2d2d2d;
-            color: #e9ecef;
-            border: 1px solid #555;
-        }
-
-        .dark-mode .form-control:focus,
-        .dark-mode .form-select:focus {
-            box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.5), 0 0 5px rgba(0, 123, 255, 0.2);
-            background: #3a3a3a;
-        }
-
-        .dark-mode .form-label,
-        .dark-mode label,
-        .dark-mode h2,
-        .dark-mode small {
-            color: #e9ecef !important;
-        }
-
-        .dark-mode ::placeholder {
-            color: #bbb !important;
-        }
-
-        .dark-mode .form-section {
-            background: rgba(45, 45, 45, 0.95);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
-        }
-
-        .dark-mode .form-section:hover {
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5);
-        }
-
-        .dark-mode .btn {
-            background: linear-gradient(90deg, #34495e, #2c3e50);
-        }
-
-        .dark-mode .btn:hover {
-            background: linear-gradient(90deg, #2c3e50, #1a252f);
-            box-shadow: 0 6px 18px rgba(44, 62, 80, 0.4);
-        }
-
-        .dark-mode .btn-danger {
-            background: linear-gradient(90deg, #c82333, #a71d2a);
-        }
-
-        .dark-mode .btn-danger:hover {
-            background: linear-gradient(90deg, #a71d2a, #8b1722);
-            box-shadow: 0 6px 18px rgba(200, 35, 51, 0.4);
-        }
-
-        /* Responsive Adjustments */
-        @media (max-width: 768px) {
-            .container {
-                margin-top: 1rem;
-                padding: 0 0.5rem;
-            }
-
-            .form-section {
-                padding: 1.5rem;
-            }
-
-            .btn {
-                padding: 10px 20px;
-                font-size: 0.9rem;
-            }
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
-<body class="bg-light" id="body">
-    <nav class="navbar navbar-dark bg-primary">
-        <div class="container">
-            <a href="/index" class="navbar-brand">Smart Trash Monitoring</a>
-            <button class="btn btn-danger" onclick="logout()">Logout</button>
+<body>
+    <header class="app-navbar">
+        <div class="nav-inner">
+            <a class="brand" href="/index">
+                <img src="/static/logo.svg" alt="TrashDetectX">
+                <span>TrashDetectX</span>
+            </a>
+            <div class="nav-actions">
+                <button class="icon-btn" type="button" data-lang-toggle>हिंदी</button>
+                <button class="icon-btn" type="button" data-theme-toggle><i class="bi bi-moon-stars"></i></button>
+                <button class="btn-logout" type="button" onclick="logout()" data-i18n="common.logout">Logout</button>
+            </div>
         </div>
-    </nav>
+    </header>
 
-    <div class="container mt-4">
-        <h2 class="text-center">Report a Trash Location</h2>
-        <div class="form-section">
-            <form id="reportForm" class="mt-4">
-                <!-- Select Block -->
-                <div class="mb-3">
-                    <label class="form-label">Select Block:</label>
-                    <select id="blockSelect" class="form-select" required>
-                        <option value="" disabled selected>Select a Block</option>
-                        <option value="M Block">M Block</option>
-                        <option value="E Block">E Block</option>
-                    </select>
+    <main class="page-shell report-shell">
+        <div class="report-grid">
+            <aside class="report-intro">
+                <span class="eyebrow" data-i18n="report.eyebrow">Submit a verified report</span>
+                <h1 data-i18n="report.heading">Report a waste issue</h1>
+                <p data-i18n="report.copy">Tell us where you found the waste, add a photo, and let TrashDetectX verify it.</p>
+
+                <div class="steps">
+                    <div class="step"><span class="step-num">1</span><span data-i18n="report.step1">Choose the exact block, floor and area.</span></div>
+                    <div class="step"><span class="step-num">2</span><span data-i18n="report.step2">Upload a clear image for AI verification.</span></div>
+                    <div class="step"><span class="step-num">3</span><span data-i18n="report.step3">The report is sent to the admin dashboard after detection.</span></div>
                 </div>
+            </aside>
 
-                <!-- Select Floor -->
-                <div class="mb-3">
-                    <label class="form-label">Select Floor:</label>
-                    <select id="floorSelect" class="form-select" disabled required>
-                        <option value="" disabled selected>Select a Floor</option>
-                        <!-- Floors will be populated dynamically -->
-                    </select>
-                </div>
+            <section class="surface-card report-card">
+                <form id="reportForm" novalidate>
+                    <div class="section-title" data-i18n="report.location">Location</div>
 
-                <!-- Select Area -->
-                <div class="mb-3">
-                    <label class="form-label">Select Area:</label>
-                    <select id="areaSelect" class="form-select" disabled required>
-                        <option value="" disabled selected>Select an Area</option>
-                        <!-- Areas will be populated dynamically -->
-                    </select>
-                </div>
+                    <div class="location-grid">
+                        <div>
+                            <label class="modern-label" for="blockSelect" data-i18n="report.block">Block</label>
+                            <select id="blockSelect" class="form-control-modern" required>
+                                <option value="" disabled selected data-i18n="report.blockPlaceholder">Select a block</option>
+                                <option value="M Block">M Block</option>
+                                <option value="E Block">E Block</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="modern-label" for="floorSelect" data-i18n="report.floor">Floor</label>
+                            <select id="floorSelect" class="form-control-modern" disabled required>
+                                <option value="" disabled selected data-i18n="report.floorPlaceholder">Select a floor</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="modern-label" for="areaSelect" data-i18n="report.area">Area</label>
+                            <select id="areaSelect" class="form-control-modern" disabled required>
+                                <option value="" disabled selected data-i18n="report.areaPlaceholder">Select an area</option>
+                            </select>
+                        </div>
+                    </div>
 
-                <!-- Additional Details -->
-                <div class="mb-3">
-                    <label class="form-label">Additional Details (Optional):</label>
-                    <input type="text" id="additionalDetails" class="form-control" placeholder="e.g., Near washroom zone">
-                </div>
+                    <div class="mt-4">
+                        <label class="modern-label" for="additionalDetails" data-i18n="report.details">Additional details</label>
+                        <input id="additionalDetails" class="form-control-modern" type="text" data-i18n-placeholder="report.detailsPlaceholder" placeholder="Example: near the entrance or beside the dustbin">
+                    </div>
 
-                <!-- Photo Upload -->
-                <div class="mb-4">
-                    <label class="form-label">Upload Photo:</label>
-                    <input type="file" id="trashPhoto" class="form-control" accept="image/*" capture="environment" required>
-                    <small class="text-muted">For best results, use your camera to take a new photo</small>
-                </div>
+                    <div class="section-title mt-4" data-i18n="report.photo">Evidence photo</div>
 
-                <button type="submit" class="btn btn-success w-100" id="submitBtn">Submit Report</button>
-            </form>
+                    <div id="fileDrop" class="file-drop">
+                        <div class="file-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+                        <div class="fw-bold" data-i18n="report.photoHint">Drag & drop an image here or click to browse</div>
+                        <div class="small text-secondary mt-1" data-i18n="report.photoSub">JPEG, PNG or WebP</div>
+                        <input type="file" id="trashPhoto" accept="image/*" capture="environment" required>
+                        <div id="fileName" class="small text-primary fw-semibold mt-2"></div>
+                    </div>
+
+                    <div id="previewWrap" class="preview-wrap">
+                        <img id="previewImage" alt="Preview">
+                    </div>
+
+                    <button id="submitBtn" type="submit" class="btn btn-primary btn-lg w-100 rounded-4 mt-4 py-3">
+                        <i class="bi bi-shield-check me-2"></i><span data-i18n="report.submit">Analyze & Submit Report</span>
+                    </button>
+
+                    <div id="formStatus" class="status-box" aria-live="polite"></div>
+                </form>
+            </section>
         </div>
-    </div>
+        <div class="footer-space"></div>
+    </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
-    <script type="module" src="{{ url_for('static', filename='js/report.js') }}"></script>
-    <script>
-        // Basic logout function (customize as needed)
-        function logout() {
-            window.location.href = "/logout"; // Adjust this URL to your logout endpoint
-        }
-    </script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="{{ url_for('static', filename='js/firebase-config.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/report.js') }}"></script>
 </body>
 </html>

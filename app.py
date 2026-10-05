@@ -1,193 +1,257 @@
+from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect, url_for
 from flask_cors import CORS
 from flask_session import Session
 from werkzeug.utils import secure_filename
-import os
 import firebase_admin
 from firebase_admin import credentials, firestore
-from google.api_core import retry
 from Detect import detect_trash_yolo
-import webbrowser
-import threading
+
+BASE_DIR = Path(__file__).resolve().parent
 
 app = Flask(__name__)
-CORS(app, resources={r"/static/*": {"origins": "http://127.0.0.1:3000"}})
+CORS(app)
 
 # Session configuration
-app.config['SECRET_KEY'] = 'your-secret-key-here'  # Change this to a secure random key
-app.config['SESSION_TYPE'] = 'filesystem'
+app.config["SECRET_KEY"] = "change-this-secret-key"
+app.config["SESSION_TYPE"] = "filesystem"
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 Session(app)
 
-# Firebase configuration
-try:
-    cred = credentials.Certificate("firebase_config.json")
-    firebase_admin.initialize_app(cred, {
-        'projectId': 'trash-detector-58bb6'  # Replace with your actual project ID
-    })
-    db = firestore.client()
-    print("✅ Firebase initialized successfully")
-except Exception as e:
-    print(f"❌ Firebase initialization failed: {str(e)}")
-    raise
+# Firebase Admin SDK
+firebase_key = BASE_DIR / "firebase_config.json"
+if not firebase_key.exists():
+    raise FileNotFoundError(
+        f"Firebase service-account file not found: {firebase_key}"
+    )
 
-# Upload folder configuration
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
+if not firebase_admin._apps:
+    cred = credentials.Certificate(str(firebase_key))
+    firebase_admin.initialize_app(cred, {"projectId": "trash-detector-58bb6"})
 
-# Routes
-@app.route('/')
+db = firestore.client()
+print("✅ Firebase initialized successfully")
+
+UPLOAD_FOLDER = BASE_DIR / "static" / "uploads"
+DETECTED_FOLDER = BASE_DIR / "static" / "detected"
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+(DETECTED_FOLDER / "images").mkdir(parents=True, exist_ok=True)
+
+
+# -----------------------------
+# Authentication / pages
+# -----------------------------
+@app.route("/")
 def home():
-    return redirect(url_for('login'))
+    return redirect(url_for("login"))
 
-@app.route('/login', methods=['GET', 'POST'])
+
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == 'POST':
-        # This is a placeholder; actual login is handled by Firebase in auth.js
-        # We'll rely on auth.js to set session data via a callback
-        return render_template('login.html')
-    return render_template('login.html')
+    return render_template("login.html")
 
-@app.route('/auth-callback', methods=['POST'])
+
+@app.route("/auth-callback", methods=["POST"])
 def auth_callback():
-    # This route is called by auth.js after successful Firebase login
-    user = request.json.get('user')
-    if user:
-        session['logged_in'] = True
-        session['user_email'] = user.get('email')
-        return jsonify({'success': True, 'redirect': url_for('index')})
-    return jsonify({'success': False, 'error': 'Authentication failed'}), 401
+    data = request.get_json(silent=True) or {}
+    user = data.get("user") or {}
+    email = user.get("email")
 
-@app.route('/logout')
+    if not email:
+        return jsonify({"success": False, "error": "Authentication failed"}), 401
+
+    session["logged_in"] = True
+    session["user_email"] = email
+
+    return jsonify({
+        "success": True,
+        "redirect": url_for("index"),
+    })
+
+
+@app.route("/logout")
 def logout():
-    session.pop('logged_in', None)
-    session.pop('user_email', None)
-    return redirect(url_for('login'))
+    session.clear()
+    return redirect(url_for("login"))
 
-@app.route('/index')
+
+@app.route("/index")
 def index():
-    if 'logged_in' not in session or not session['logged_in']:
-        return redirect(url_for('login'))
-    return render_template('index.html')
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
 
-@app.route('/report')
+    return render_template(
+        "index.html",
+        user_email=session.get("user_email", "")
+    )
+
+
+@app.route("/report")
 def report():
-    if 'logged_in' not in session or not session['logged_in']:
-        return redirect(url_for('login'))
-    return render_template('report.html')
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
+    return render_template("report.html")
 
-@app.route('/upload', methods=['POST'])
+
+# -----------------------------
+# Image upload + YOLO detection
+# -----------------------------
+@app.route("/upload", methods=["POST"])
 def upload_image():
-    if 'logged_in' not in session or not session['logged_in']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    file = request.files.get('file')
-    if file:
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-        file.save(filepath)
+    if not session.get("logged_in"):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
 
-        try:
-            detections, saved_image_path = detect_trash_yolo(filepath)
-            print("Detections:", detections)
+    file = request.files.get("file")
 
-            if detections:
-                return jsonify({
-                    'success': True,
-                    'filename': filename,
-                    'detections': detections,
-                    'detected_image_path': saved_image_path
-                })
-            else:
-                return jsonify({'success': False, 'error': 'No trash detected'})
-        except Exception as e:
-            return jsonify({'success': False, 'error': str(e)})
+    if not file or not file.filename:
+        return jsonify({"success": False, "error": "No image uploaded"}), 400
 
-    return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+    filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({"success": False, "error": "Invalid filename"}), 400
 
-@app.route('/submit-report', methods=['POST'])
+    input_path = UPLOAD_FOLDER / filename
+    file.save(str(input_path))
+
+    try:
+        detections, detected_image_url = detect_trash_yolo(input_path)
+
+        # IMPORTANT: do not create a Firestore document here.
+        # Firestore is written exactly once by /submit-report.
+        if not detections:
+            return jsonify({
+                "success": False,
+                "error": "No trash detected in the image"
+            }), 422
+
+        return jsonify({
+            "success": True,
+            "filename": filename,
+            "detections": detections,
+            "detected_image_path": detected_image_url,
+        })
+
+    except Exception as exc:
+        app.logger.exception("YOLO detection failed")
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
+
+
+# -----------------------------
+# Save report to Firestore
+# -----------------------------
+@app.route("/submit-report", methods=["POST"])
 def submit_report():
-    if 'logged_in' not in session or not session['logged_in']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    if not session.get("logged_in"):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
 
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': 'No JSON data provided'}), 400
+        gps = data.get("gps") or {}
+        detections = data.get("detections") or []
 
-        new_report = {
-            'block': data.get('block', ''),
-            'floor': data.get('floor', ''),
-            'area': data.get('area', ''),
-            'details': data.get('details', ''),
-            'status': 'Pending',
-            'latitude': data.get('gps', {}).get('latitude'),
-            'longitude': data.get('gps', {}).get('longitude'),
-            'filename': data.get('filename', ''),
-            'detected_image': data.get('detected_image_path', ''),
-            'detections': data.get('detections', [])
+        if not data.get("block") or not data.get("floor") or not data.get("area"):
+            return jsonify({
+                "success": False,
+                "error": "Block, floor and area are required"
+            }), 400
+
+        # A report must come from a successful YOLO detection.
+        if not detections:
+            return jsonify({
+                "success": False,
+                "error": "Report rejected because no trash was detected"
+            }), 422
+
+        report = {
+            "user_email": session.get("user_email", ""),
+            "block": data.get("block", ""),
+            "floor": data.get("floor", ""),
+            "area": data.get("area", ""),
+            "details": data.get("details", ""),
+            "status": "Pending",
+            "latitude": gps.get("latitude"),
+            "longitude": gps.get("longitude"),
+            "filename": data.get("filename", ""),
+            "detected_image": data.get("detected_image_path", ""),
+            "detections": detections,
+            "created_at": firestore.SERVER_TIMESTAMP,
         }
-        
-        @retry.Retry(predicate=retry.if_transient_error, initial_delay=1, maximum=10.0, multiplier=2)
-        def add_report():
-            print("Attempting to add report to Firestore")
-            db.collection('trash_reports').add(new_report)
 
-        add_report()
-        return jsonify({'success': True, 'message': 'Report submitted successfully'})
-    except Exception as e:
-        print(f"Error in submit_report: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        # ONE Firestore write. No retry wrapper, preventing accidental duplicates.
+        doc_ref = db.collection("trash_reports").add(report)
+        print(f"✅ Report saved: {doc_ref[1].id}")
 
-@app.route('/admin/reports')
-def view_reports():
-    if 'logged_in' not in session or not session['logged_in']:
-        return redirect(url_for('login'))
-    try:
-        reports_ref = db.collection('trash_reports').order_by("block")
-        docs = reports_ref.stream()
-        reports = []
-        for doc in docs:
-            report = doc.to_dict()
-            report['id'] = doc.id
-            reports.append(report)
-        return render_template('dashboard.html', reports=reports)
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({
+            "success": True,
+            "message": "Report submitted successfully",
+            "report_id": doc_ref[1].id,
+        })
 
-@app.route('/update-status/<string:report_id>', methods=['POST'])
-def update_status(report_id):
-    if 'logged_in' not in session or not session['logged_in']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    data = request.get_json()
-    try:
-        db.collection('trash_reports').document(report_id).update({'status': data.get('status', 'Pending')})
-        return jsonify({'success': True, 'message': 'Status updated'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+    except Exception as exc:
+        app.logger.exception("Firestore save failed")
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
 
-@app.route('/delete-report/<string:report_id>', methods=['DELETE'])
-def delete_report(report_id):
-    if 'logged_in' not in session or not session['logged_in']:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    try:
-        db.collection('trash_reports').document(report_id).delete()
-        return jsonify({'success': True, 'message': 'Report deleted'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/admin/dashboard')
+# -----------------------------
+# Admin dashboard
+# -----------------------------
+@app.route("/admin/dashboard")
 def admin_dashboard():
-    if 'logged_in' not in session or not session['logged_in']:
-        return redirect(url_for('login'))
-    return render_template('dashboard.html')
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
+    return render_template("dashboard.html")
 
-@app.route('/detected/<path:filename>')
+
+@app.route("/admin/reports")
+def view_reports():
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
+    return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/update-status/<string:report_id>", methods=["POST"])
+def update_status(report_id):
+    if not session.get("logged_in"):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    new_status = data.get("status", "Pending")
+
+    try:
+        db.collection("trash_reports").document(report_id).update({
+            "status": new_status
+        })
+        return jsonify({"success": True, "message": "Status updated"})
+    except Exception as exc:
+        app.logger.exception("Status update failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@app.route("/delete-report/<string:report_id>", methods=["DELETE"])
+def delete_report(report_id):
+    if not session.get("logged_in"):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+
+    try:
+        db.collection("trash_reports").document(report_id).delete()
+        return jsonify({"success": True, "message": "Report deleted"})
+    except Exception as exc:
+        app.logger.exception("Delete failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+# /detected/images/foo.jpg -> static/detected/images/foo.jpg
+@app.route("/detected/<path:filename>")
 def serve_detected_images(filename):
-    return send_from_directory('static/detected', filename)
+    return send_from_directory(str(DETECTED_FOLDER), filename)
 
-def open_browser():
-    webbrowser.open_new('http://127.0.0.1:5000/')
 
-if __name__ == '__main__':
-    threading.Timer(1, open_browser).start()  # Open browser after 1 second
+if __name__ == "__main__":
     app.run(debug=True, port=5000)

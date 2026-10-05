@@ -1,29 +1,71 @@
+from pathlib import Path
 from ultralytics import YOLO
-import os
+import cv2
 
-# Load the trained model once
-model_path = "runs/detect/train/yolov8s_100epochs/weights/best.pt"
-model = YOLO(model_path)
-print(f"✅ YOLOv8 model loaded from {model_path}")
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = "model/best.pt"
+OUTPUT_DIR = BASE_DIR / "static" / "detected" / "images"
+
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+model = YOLO(str(MODEL_PATH))
+print(f"✅ YOLOv8 model loaded from {MODEL_PATH}")
+
 
 def detect_trash_yolo(image_path):
-    if not os.path.exists(image_path):
+    """Run YOLO on one image and save an annotated copy for the dashboard.
+
+    Returns:
+        (detections, url_path)
+        detections = list of {class, confidence, bbox}
+        url_path   = browser path served by Flask, e.g. /detected/images/foo.jpg
+    """
+    image_path = Path(image_path)
+
+    if not image_path.exists():
         print(f"❌ File not found: {image_path}")
         return [], None
 
-    # Perform detection and save image with boxes
-    results = model.predict(source=image_path, save=True, conf=0.25, project="static/detected", name="images", exist_ok=True)
+    results = model.predict(
+        source=str(image_path),
+        save=False,
+        conf=0.25,
+        verbose=False,
+    )
 
-    detected_classes = []
+    detections = []
+
     for result in results:
-        for cls_id in result.boxes.cls.tolist():
-            class_name = model.names[int(cls_id)]
-            detected_classes.append(class_name)
+        if result.boxes is None:
+            continue
 
-    # Get the path of the saved image directly from results
-    saved_image_path = os.path.join(results[0].save_dir, os.path.basename(image_path))
-    print(f"Saved image path: {saved_image_path}")  # Debug print
+        for box in result.boxes:
+            class_id = int(box.cls[0].item())
+            confidence = float(box.conf[0].item())
+            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
 
-    # Return a clean relative path
-    relative_path = os.path.relpath(saved_image_path, os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")).replace("\\", "/")
-    return list(set(detected_classes)), relative_path
+            detections.append({
+                "class": model.names[class_id],
+                "confidence": round(confidence, 4),
+                "bbox": [x1, y1, x2, y2],
+            })
+
+    if not detections:
+        print("⚠️ No trash detected")
+        return [], None
+
+    # Let Ultralytics draw the bounding boxes and labels.
+    annotated = results[0].plot()
+
+    output_name = f"detected_{image_path.stem}.jpg"
+    output_path = OUTPUT_DIR / output_name
+    cv2.imwrite(str(output_path), annotated)
+
+    # This is a URL, NOT a Windows filesystem path.
+    url_path = f"/detected/images/{output_name}"
+
+    print(f"✅ Saved detected image: {output_path}")
+    print(f"✅ Dashboard image URL: {url_path}")
+    print(f"✅ Detections: {detections}")
+
+    return detections, url_path

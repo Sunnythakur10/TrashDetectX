@@ -1,6 +1,89 @@
+# =========================
+# Python
+# =========================
+
+__pycache__/
+*.py[cod]
+
+.venv/
+venv/
+env/
+ENV/
+
+*.log
+
+
+# =========================
+# Flask runtime
+# =========================
+
+flask_session/
+instance/
+
+# Uploaded images
+static/uploads/
+uploads/
+
+# YOLO generated output
+runs/
+
+# Detected/generated images
+static/detected/
+
+
+# =========================
+# Local test images
+# =========================
+
+# Root-level JPG/JPEG/PNG test images
+/*.jpg
+/*.jpeg
+/*.png
+
+# Images directly inside static/
+static/*.jpg
+static/*.jpeg
+static/*.png
+
+
+# =========================
+# Firebase private credentials
+# =========================
+
+firebase_config.json
+
+
+# =========================
+# Node
+# =========================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+
+# =========================
+# Firebase local/CLI files
+# =========================
+
+.firebase/
+
+
+# =========================
+# IDE / OS
+# =========================
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+
+# =========================
+# Temporary files
+# =========================
+
 *~
-yolov8n.pt
-yolov8s.pt
-yolov8m.pt
-"firebase_config.json" 
-"firebase_config.json" 
+*.tmp
+*.temp

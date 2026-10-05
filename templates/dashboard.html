@@ -3,51 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Admin Dashboard - Smart Trash Monitoring</title>
+    <title>Admin Dashboard | TrashDetectX</title>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="{{ url_for('static', filename='js/firebase-config.js') }}"></script>
 </head>
-<body class="bg-light">
-    <nav class="navbar navbar-dark bg-primary">
-        <div class="container">
-            <a href="/index" class="navbar-brand">Smart Trash Monitoring</a>
-            <button class="btn btn-danger" onclick="logout()">Logout</button>
+<body>
+    <header class="app-navbar">
+        <div class="nav-inner">
+            <a class="brand" href="/index">
+                <img src="/static/logo.svg" alt="TrashDetectX">
+                <span>TrashDetectX Admin</span>
+            </a>
+            <div class="nav-actions">
+                <button class="icon-btn" type="button" data-lang-toggle>हिंदी</button>
+                <button class="icon-btn" type="button" data-theme-toggle><i class="bi bi-moon-stars"></i></button>
+                <button class="btn-logout" type="button" onclick="logout()" data-i18n="common.logout">Logout</button>
+            </div>
         </div>
-    </nav>
+    </header>
 
-    <div class="container mt-4">
-        <h2 class="text-center">Admin Dashboard - Trash Reports</h2>
-        <div id="statusSummary" class="mb-3 text-center"></div>
-        <div class="table-responsive">
-            <table class="table table-bordered table-striped mt-3">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Block</th>
-                        <th>Floor</th>
-                        <th>Area</th>
-                        <th>Details</th>
-                        <th>Status</th>
-                        <th>Image & Location</th>
-                        <th>Detected Trash</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="reportTableBody">
-                    <!-- Dynamic content will be injected here -->
-                </tbody>
-            </table>
+    <main class="page-shell">
+        <section class="dashboard-hero">
+            <div class="dashboard-head">
+                <div>
+                    <span class="eyebrow" data-i18n="admin.eyebrow">Operations center</span>
+                    <h1 data-i18n="admin.heading">Admin control center</h1>
+                    <p data-i18n="admin.copy">Monitor incoming reports, inspect detected waste and keep cleanup status up to date.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="stat-grid">
+            <article class="stat-card">
+                <div class="stat-label" data-i18n="admin.total">Total reports</div>
+                <div id="totalCount" class="stat-value">0</div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-label" data-i18n="admin.pending">Pending</div>
+                <div id="pendingCount" class="stat-value text-warning">0</div>
+            </article>
+            <article class="stat-card">
+                <div class="stat-label" data-i18n="admin.resolved">Resolved</div>
+                <div id="resolvedCount" class="stat-value text-success">0</div>
+            </article>
+        </section>
+
+        <section class="toolbar">
+            <input id="searchInput" type="search" data-i18n-placeholder="admin.search" placeholder="Search block, area or details...">
+            <select id="statusFilter">
+                <option value="" data-i18n="admin.allStatus">All statuses</option>
+                <option value="Pending" data-i18n="admin.pendingStatus">Pending</option>
+                <option value="Resolved" data-i18n="admin.resolvedStatus">Resolved</option>
+            </select>
+            <select id="classFilter">
+                <option value="" data-i18n="admin.allClasses">All classes</option>
+            </select>
+        </section>
+
+        <div id="statusSummary" class="small text-secondary mb-2" aria-live="polite" data-i18n="admin.loading">Loading reports...</div>
+
+        <section class="table-card">
+            <div class="table-wrap">
+                <table class="modern-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="admin.block">Block</th>
+                            <th data-i18n="admin.floor">Floor</th>
+                            <th data-i18n="admin.area">Area</th>
+                            <th data-i18n="admin.details">Details</th>
+                            <th data-i18n="admin.status">Status</th>
+                            <th data-i18n="admin.media">Image & location</th>
+                            <th data-i18n="admin.classes">Detected classes</th>
+                            <th data-i18n="admin.actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody"></tbody>
+                </table>
+
+                <div id="emptyState" class="empty-state" hidden>
+                    <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                    <div class="fw-bold" data-i18n="admin.empty">No reports match your filters.</div>
+                </div>
+            </div>
+        </section>
+
+        <div class="footer-space"></div>
+    </main>
+
+    <div id="imageModalBackdrop" class="modal-backdrop-custom">
+        <div class="image-modal">
+            <div class="modal-top">
+                <h3 data-i18n="admin.imageTitle">Detected trash image</h3>
+                <button id="closeImageModal" class="close-modal" type="button" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <img id="modalImage" src="" alt="Detected trash">
         </div>
     </div>
 
-    <script>
-        function logout() {
-            window.location.href = '/logout';
-        }
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>
