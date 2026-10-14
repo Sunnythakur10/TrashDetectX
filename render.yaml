@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: trashdetectx
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 1 --threads 2 --timeout 180 app:app
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FIREBASE_SERVICE_ACCOUNT_FILE
+        value: /etc/secrets/firebase_config.json
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false

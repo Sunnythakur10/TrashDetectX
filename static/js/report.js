@@ -178,7 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const uploadData = await uploadResponse.json();
 
             if (!uploadResponse.ok || !uploadData.success) {
-                if (uploadData.error === "No trash detected") {
+                if ((uploadData.error || "").toLowerCase().includes("no trash detected")) {
                     setStatus(getText("report.noTrash"), "error");
                     return;
                 }
