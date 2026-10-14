@@ -6,3 +6,4 @@ google-api-core
 ultralytics
 Pillow
 piexif
+gunicorn
